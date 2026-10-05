@@ -1,0 +1,20 @@
+# Binary
+/reading-tracker
+/dist/
+
+# SQLite files (users' data — never commit)
+*.db
+*.db-wal
+*.db-shm
+
+# Local config
+.env
+*.local.yaml
+
+# Editor
+.idea/
+.vscode/
+.DS_Store
+
+# Test artifacts
+coverage.out
