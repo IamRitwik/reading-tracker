@@ -8,11 +8,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/IamRitwik/reading-tracker/internal/db"
-	"github.com/IamRitwik/reading-tracker/internal/domain"
-	"github.com/IamRitwik/reading-tracker/internal/repository"
 	"github.com/IamRitwik/reading-tracker/internal/repository/sqlite"
+	"github.com/IamRitwik/reading-tracker/internal/service"
 )
 
 func main() {
@@ -67,14 +67,22 @@ func run(ctx context.Context) error {
 	}
 	defer database.Close()
 
-	bookRepo := sqlite.NewBookRepo(database)
+	// Per-component child loggers. Any log emitted through this logger will
+	// carry component="service". In production with a log aggregator, this
+	// is how you filter "show me only service errors."
+	repo := sqlite.NewBookRepo(database)
+	svc := service.NewBookService(
+		repo,
+		logger.With(slog.String("component", "service")),
+		2*time.Second,
+	)
 
 	// Seed a demo book on first run so there's something to see.
-	if err := seedIfEmpty(ctx, bookRepo, logger); err != nil {
+	if err := seedIfEmpty(ctx, svc, logger); err != nil {
 		return err
 	}
 
-	books, err := bookRepo.List(ctx, repository.BookFilter{})
+	books, err := svc.List(ctx, service.ListInput{})
 	if err != nil {
 		return fmt.Errorf("list books: %w", err)
 	}
@@ -92,8 +100,8 @@ func run(ctx context.Context) error {
 	return nil
 }
 
-func seedIfEmpty(ctx context.Context, repo repository.BookRepository, logger *slog.Logger) error {
-	books, err := repo.List(ctx, repository.BookFilter{Limit: 1})
+func seedIfEmpty(ctx context.Context, svc *service.BookService, logger *slog.Logger) error {
+	books, err := svc.List(ctx, service.ListInput{Limit: 1})
 	if err != nil {
 		return err
 	}
@@ -101,30 +109,40 @@ func seedIfEmpty(ctx context.Context, repo repository.BookRepository, logger *sl
 		return nil
 	}
 
-	seed := []*domain.Book{
+	seed := []service.AddBookInput{
 		{
 			Title:       "Mastering Go",
 			Author:      "Mihalis Tsoukalos",
 			Category:    "Programming",
 			Description: "Leverage Go's expertise for advanced utilities",
 			TotalPages:  711,
-			PagesRead:   525,
-			Status:      domain.StatusReading,
 		},
 		{
 			Title:       "Concurrency in GO",
 			Author:      "Katherine Cox-Buday",
 			Category:    "Programming",
 			Description: "Tools & Techniques for developers",
-			TotalPages:  223,
-			Status:      domain.StatusWantToRead,
+			TotalPages:  224,
 		},
 	}
-	for _, b := range seed {
-		if err := repo.Create(ctx, b); err != nil {
-			return fmt.Errorf("seed %q: %w", b.Title, err)
+	var firstID int64
+	for i, in := range seed {
+		b, err := svc.Add(ctx, in)
+		if err != nil {
+			return fmt.Errorf("seed %q: %w", in.Title, err)
+		}
+		if i == 0 {
+			firstID = b.ID
 		}
 	}
+
+	if firstID > 0 {
+		_, err := svc.UpdateProgress(ctx, firstID, 526)
+		if err != nil {
+			return fmt.Errorf("seed progress: %w", err)
+		}
+	}
+
 	logger.InfoContext(ctx, "seeded demo books", slog.Int("count", len(seed)))
 	return nil
 }
