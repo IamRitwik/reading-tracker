@@ -11,8 +11,15 @@ import (
 	"time"
 
 	"github.com/IamRitwik/reading-tracker/internal/db"
+	"github.com/IamRitwik/reading-tracker/internal/observability"
 	"github.com/IamRitwik/reading-tracker/internal/repository/sqlite"
 	"github.com/IamRitwik/reading-tracker/internal/service"
+)
+
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unkwnown"
 )
 
 func main() {
@@ -32,45 +39,57 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	// Set up structured logging. For now, dev mode (text).
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level:     slog.LevelDebug,
-		AddSource: true,
-	}))
+
+	// 1. Logging - one call, ev-driven.
+	logger := observability.NewLogger(observability.LoggerConfigFromEnv())
 	slog.SetDefault(logger)
 
 	logger.InfoContext(ctx, "reading-tracker starting",
-		slog.String("version", "0.0.1"),
+		slog.String("version", version),
+		slog.String("commit", commit),
+		slog.String("built", date),
 	)
 
-	// We'll add CLI/TUI wiring here in later phases.
-	// For now, just confirm the skeleton works.
-	logger.InfoContext(ctx, "reading-tracker exiting cleanly")
-
+	// 2. Data Directory.
 	dataDir, err := os.UserConfigDir()
 	if err != nil {
 		return fmt.Errorf("user config dir: %w", err)
 	}
-
 	appDir := filepath.Join(dataDir, "reading-tracker")
 	err = os.MkdirAll(appDir, 0o755)
 	if err != nil {
 		return fmt.Errorf("create app dir: %w", err)
 	}
-
 	dbPath := filepath.Join(appDir, "reading.db")
-	logger.InfoContext(ctx, "opening database", slog.String("path", dbPath))
 
+	// 3. Open DB.
 	database, err := db.Open(ctx, dbPath)
 	if err != nil {
 		return err
 	}
 	defer database.Close()
+	logger.InfoContext(ctx, "database opened", slog.String("path", dbPath))
 
-	// Per-component child loggers. Any log emitted through this logger will
-	// carry component="service". In production with a log aggregator, this
-	// is how you filter "show me only service errors."
-	repo := sqlite.NewBookRepo(database)
+	// 4. Metrics registry.
+	metrics := observability.NewMetrics()
+
+	// 5. Optionally expose /metrics. Set RT_METRICS_ADDR=:2112 to enable.
+	if addr := os.Getenv("RT_METRICS_ADDR"); addr != "" {
+		observability.StartMetricsServer(
+			ctx, addr, metrics,
+			logger.With(slog.String("component", "metrics")),
+		)
+	}
+
+	// 6. Compose the repo stack.
+	baseRepo := sqlite.NewBookRepo(database)
+	repo := observability.NewInstrumentedBookRepo(
+		baseRepo,
+		metrics,
+		logger.With(slog.String("component", "repo")),
+	)
+
+	// 7. Service on top.
 	svc := service.NewBookService(
 		repo,
 		logger.With(slog.String("component", "service")),
@@ -97,7 +116,11 @@ func run(ctx context.Context) error {
 	}
 	fmt.Println()
 
+	logger.InfoContext(ctx, "waiting for shutdown signal")
+	<-ctx.Done()
+
 	return nil
+
 }
 
 func seedIfEmpty(ctx context.Context, svc *service.BookService, logger *slog.Logger) error {
@@ -116,6 +139,13 @@ func seedIfEmpty(ctx context.Context, svc *service.BookService, logger *slog.Log
 			Category:    "Programming",
 			Description: "Leverage Go's expertise for advanced utilities",
 			TotalPages:  711,
+		},
+		{
+			Title:       "Learning Go",
+			Author:      "Jon Bodner",
+			Category:    "Programming",
+			Description: "An idiomatic approach to real world Go programming",
+			TotalPages:  353,
 		},
 		{
 			Title:       "Concurrency in GO",
