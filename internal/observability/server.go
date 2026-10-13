@@ -42,11 +42,31 @@ func StartMetricsServer(ctx context.Context, addr string, m *Metrics, logger *sl
 
 	go func() {
 		<-ctx.Done()
-		// Give in-flight scrapes a moment to finish before force-closing.
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+		logger.Info("metrics server shutting down")
+
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			3*time.Second,
+		)
 		defer cancel()
+
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.WarnContext(ctx, "metrics server shutdown", slog.Any("err", err))
+			logger.Warn(
+				"metrics server graceful shutdown failed",
+				slog.Any("err", err),
+			)
+
+			if closeErr := srv.Close(); closeErr != nil {
+				logger.Warn(
+					"metrics server forced close failed",
+					slog.Any("err", closeErr),
+				)
+			}
+
+			return
 		}
+
+		logger.Info("metrics server stopped")
 	}()
 }

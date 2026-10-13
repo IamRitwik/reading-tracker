@@ -14,6 +14,7 @@ import (
 	"github.com/IamRitwik/reading-tracker/internal/observability"
 	"github.com/IamRitwik/reading-tracker/internal/repository/sqlite"
 	"github.com/IamRitwik/reading-tracker/internal/service"
+	"github.com/IamRitwik/reading-tracker/internal/tui"
 )
 
 var (
@@ -101,6 +102,10 @@ func run(ctx context.Context) error {
 		return err
 	}
 
+	if len(os.Args) > 1 && os.Args[1] == "tui" {
+		return tui.Run(ctx, svc, logger.With(slog.String("component", "tui")))
+	}
+
 	books, err := svc.List(ctx, service.ListInput{})
 	if err != nil {
 		return fmt.Errorf("list books: %w", err)
@@ -115,11 +120,15 @@ func run(ctx context.Context) error {
 			b.ProgressPercent(), b.Status)
 	}
 	fmt.Println()
-
-	logger.InfoContext(ctx, "waiting for shutdown signal")
-	<-ctx.Done()
-
+	fmt.Println("Tip: run `reading-tracker tui` for the interactive interface.")
 	return nil
+
+	// logger.InfoContext(ctx, "waiting for shutdown signal")
+	// <-ctx.Done()
+
+	// logger.Info("main function stopped...")
+
+	// return nil
 
 }
 
