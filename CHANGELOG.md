@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-14
+
+### Added
+- Updated README and usage guide
+
 ## [0.1.0] - 2026-10-14
 
 ### Added

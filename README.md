@@ -16,18 +16,18 @@ ID   TITLE                          AUTHOR                 CATEGORY      PROGRES
 
 ```
 $ reading-tracker tui
-╭──────────────────────────────────────────────╮
-│  📚 Reading Tracker                          │
-│                                              │
-│  ▸ Mastering Go                              │
+╭──────────────────────────────────────────────                                 ╮
+│  📚 Reading Tracker                                                            
+│                                                                               │
+│  ▸ Mastering Go                                                               │
 │      Mihalis Tsoukalos  ███████████░░░░  74%  READING
-│    Concurrency in Go                         │
+│    Concurrency in Go                                                          │
 │      Katherine Cox-Buday  ░░░░░░░░░░░░░░░   0%  WANT
-│    Sapiens                                   │
+│    Sapiens                                                                    │
 │      Yuval Noah Harari  ███████████████ 100%  DONE
-│                                              │
+│                                                                               │
 │  ↑/k ↓/j move · enter detail · a add · u update · d delete · s stats · q quit
-╰──────────────────────────────────────────────╯
+╰──────────────────────────────────────────────                                 ╯
 ```
 
 ## Features
