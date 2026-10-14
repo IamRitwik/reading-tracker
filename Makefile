@@ -63,10 +63,9 @@ package:
 		os=$${target%/*}; arch=$${target#*/}; \
 		src="$(BINARY)-$${os}-$${arch}"; \
 		dst="$(BINARY)_$(VERSION_CLEAN)_$${os}_$${arch}"; \
-		mkdir -p "$$dst"; \
-		cp "$$src" "$$dst/$(BINARY)"; \
-		tar -czf "$$dst.tar.gz" "$$dst"; \
-		rm -rf "$$dst" "$$src"; \
+		cp "$$src" "$(BINARY)"; \
+		tar -czf "$$dst.tar.gz" "$(BINARY)"; \
+		rm -f "$(BINARY)" "$$src"; \
 	done
 
 checksums:
